@@ -45,3 +45,5 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'avatar',
         ]
+
+
