@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count
 from .models import ChatRoom, RoomMember
-from .serializers import PrivateChatCreateSerializer, GroupChatCreateSerializer
+from .serializers import PrivateChatCreateSerializer, GroupChatCreateSerializer, ChatRoomListSerializer
 
 # Create your views here.
 
@@ -82,3 +82,23 @@ class GroupChatView(APIView):
             "name": room.name,
             "message": "Group chat created"
         })
+
+
+class ChatListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        rooms = (
+            ChatRoom.objects
+            .filter(members__user=request.user)
+            .distinct()
+            .order_by('-created_at')
+        )
+
+        serializer = ChatRoomListSerializer(
+            rooms,
+            many=True,
+            context={'request': request}
+        )
+
+        return Response(serializer.data)
