@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import ChatRoom, RoomMember
+from .models import ChatRoom, RoomMember, Message
 
 
 class PrivateChatCreateSerializer(serializers.Serializer):
@@ -66,4 +66,21 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
         ).select_related('user').first()
 
         return other_member.user.username if other_member else "Unknown"
-        
+
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender_username = serializers.CharField(
+        source='sender.username',
+        read_only=True
+    )
+
+    class Meta:
+        model = Message
+        fields = [
+            'id',
+            'content',
+            'message_type',
+            'sender_username',
+            'created_at'
+        ]
+        read_only_fields = ['sender']

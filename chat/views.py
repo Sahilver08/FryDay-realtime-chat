@@ -3,8 +3,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count
-from .models import ChatRoom, RoomMember
-from .serializers import PrivateChatCreateSerializer, GroupChatCreateSerializer, ChatRoomListSerializer
+from .models import ChatRoom, RoomMember, Message
+from .serializers import PrivateChatCreateSerializer, GroupChatCreateSerializer, ChatRoomListSerializer, MessageSerializer
+from django.core.paginator import Paginator
 
 # Create your views here.
 
@@ -102,3 +103,85 @@ class ChatListView(APIView):
         )
 
         return Response(serializer.data)
+
+
+class SendMessageView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        print("REQUEST DATA:", request.data)
+        room_id = request.data.get('room')
+
+        if not room_id:
+            return Response(
+                {"error": "Room ID is required."}, status=400
+            )
+
+        try:
+            room = ChatRoom.objects.get(uuid=room_id)
+        except ChatRoom.DoesNotExist:
+            return Response(
+                {"error": "Room not Found"}, status=404
+
+            )
+
+        #Ensure user is member
+        if not RoomMember.objects.filter(room=room, user=request.user).exists():
+            return Response(
+                {"error": "You are not a member of this room."}, status=403
+            )
+
+        serializer = MessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        message = serializer.save(
+            sender=request.user,
+            room=room
+        )
+
+        return Response(
+            MessageSerializer(message).data,
+            status=201
+        )
+
+
+class MessageListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        room_id = request.query_params.get('room')
+        page_number = request.query_params.get('page', 1)
+
+        if not room_id:
+            return Response(
+                {"error": "Room ID is required."}, status=400
+            )
+
+        try:
+            room = ChatRoom.objects.get(uuid=room_id)
+        except ChatRoom.DoesNotExist:
+            return Response(
+                {"error": "Room Not Found"}, status=404
+            )
+
+        if not RoomMember.objects.filter(
+            room=room,
+            user=request.user
+        ).exists():
+            return Response(
+                {"error": "You are not a member of this room."}, status=403
+            )
+
+        messages = (
+            Message.objects.filter(room=room).order_by('-created_at')
+        )
+
+        paginator = Paginator(messages, 20)
+        page = paginator.get_page(page_number)
+
+        serializer = MessageSerializer(page, many=True)
+
+        return Response({
+            "messages": serializer.data,
+            "has_next": page.has_next()
+        })
