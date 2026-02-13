@@ -38,9 +38,11 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'channels',
     'accounts',
     'chat',
     'common',
+    
 ]
 
 MIDDLEWARE = [
@@ -71,6 +73,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+
+
+ASGI_APPLICATION = 'config.asgi.application'
+
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 
 
 # Database
@@ -139,4 +148,11 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
 }

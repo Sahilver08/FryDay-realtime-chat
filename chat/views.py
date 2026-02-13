@@ -109,7 +109,7 @@ class SendMessageView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        print("REQUEST DATA:", request.data)
+        # print("REQUEST DATA:", request.data)
         room_id = request.data.get('room')
 
         if not room_id:
