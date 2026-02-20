@@ -2,6 +2,7 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import AnonymousUser
 from .models import ChatRoom, RoomMember, Message
+from django.utils import timezone
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -43,13 +44,50 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
 
+        await self.channel_layer.group_add(
+            "presence_global",
+            self.channel_name
+        )
+
         await self.accept()
+
+        # mark user as online
+        self.user.profile.is_online = True
+        self.user.profile.last_seen = timezone.now()
+        await self.user.profile.asave()
+
+        # broadcast to room group that user is online
+        await self.channel_layer.group_send(
+            "presence_global",
+            {
+                "type": "user_status",
+                "user_id": self.user.id,
+                "username": self.user.username,
+                "is_online": True,
+            }
+        )
 
     async def disconnect(self, close_code):
         # leave room group
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name
+        )
+
+        # mark user as offline
+        self.user.profile.is_online = False
+        self.user.profile.last_seen = timezone.now()
+        await self.user.profile.asave()
+
+        # broadcast to room group that user is offline
+        await self.channel_layer.group_send(
+            "presence_global",
+            {
+                "type": "user_status",
+                "user_id": self.user.id,
+                "username": self.user.username,
+                "is_online": False,
+            }
         )
 
     async def receive(self, text_data):
@@ -90,4 +128,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "content": event["content"],
             "sender": event["sender"],
             "created_at": event["created_at"]
+        }))
+
+    async def user_status(self, event):
+        """Triggered when a user comes online or goes offline"""
+
+        await self.send(text_data=json.dumps({
+            "type": "presence",
+            "user_id": event["user_id"],
+            "username": event["username"],
+            "is_online": event["is_online"]
         }))
