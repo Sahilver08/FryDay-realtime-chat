@@ -1,8 +1,11 @@
 import json
+import profile
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import AnonymousUser
 from .models import ChatRoom, RoomMember, Message
 from django.utils import timezone
+from channels.db import database_sync_to_async
+from accounts.models import Profile
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -52,9 +55,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         # mark user as online
-        self.user.profile.is_online = True
-        self.user.profile.last_seen = timezone.now()
-        await self.user.profile.asave()
+        await self.update_user_online_status(True)
 
         # broadcast to room group that user is online
         await self.channel_layer.group_send(
@@ -75,9 +76,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
         # mark user as offline
-        self.user.profile.is_online = False
-        self.user.profile.last_seen = timezone.now()
-        await self.user.profile.asave()
+        await self.update_user_online_status(False)
 
         # broadcast to room group that user is offline
         await self.channel_layer.group_send(
@@ -139,3 +138,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "username": event["username"],
             "is_online": event["is_online"]
         }))
+
+    @database_sync_to_async
+    def update_user_online_status(self, is_online):
+        profile, _ = Profile.objects.get_or_create(user=self.user)
+        profile.is_online = is_online
+        profile.last_seen = timezone.now()
+        profile.save()
